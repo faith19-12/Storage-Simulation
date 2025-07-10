@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Storage Facility Explorer</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+    
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #66C18E;
+        }
+       
+        nav ul {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        nav li {
+            margin-left: 20px;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        #container {
+            width: 100%;
+            height: 60vh;
+            position: relative;
+            flex-grow: 1;
+        }
+        .controls {
+            text-align: center;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        button {
+            padding: 8px 15px;
+            margin: 0 5px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin: 0 5px;
+        }
+        .tank-info {
+            padding: 15px;
+            background-color: #f2f2f2;
+            margin: 10px auto;
+            max-width: 800px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin: 10px 0;
+            padding: 0 15px;
+        }
+        .close-btn {
+            float: right;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+       
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                text-align: center;
+            }
+            nav ul {
+                margin-top: 10px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            nav li {
+                margin: 5px 10px;
+            }
+            .controls {
+                padding: 10px 5px;
+            }
+            button, select {
+                margin: 5px 2px;
+                padding: 6px 10px;
+                font-size: 0.9em;
+            }
+            #container {
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+  <header>
+    <h1>3D Storage Facility Simulation</h1>
+  </header>
+
+  <nav class="main-nav">
+    <ul>
+      <li><a href="index.html">Dashboard</a></li>
+      <li><a href="storage.html">3D Storage</a></li>
+      <li><a href="pressure.html">Pipeline Pressure</a></li>
+      <li><a href="route.html">Transport Route</a></li>
+      <li><a href="safety.html">Safety Scenario</a></li>
+    </ul>
+  </nav>
+    
+    <div class="controls">
+        <button id="resetView">Reset View</button>
+        <select id="tankType">
+            <option value="gas">Gas Storage Tank</option>
+            <option value="liquid">Liquid Storage Tank</option>
+            <option value="hydride">Hydride Storage Tank</option>
+        </select>
+        <button id="showInfo">Show Info</button>
+    </div>
+    
+    <div id="container">
+        <div class="loading">Loading 3D viewer...</div>
+    </div>
+    
+    <div class="tank-info" id="tankInfo">
+        <span class="close-btn" id="closeInfo">×</span>
+        <div id="infoContent"></div>
+    </div>
+
+    <script>
+        // Scene setup
+        let scene, camera, renderer, tank, controls;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        
+        // Tank parameters
+        const tankParams = {
+            gas: {
+                name: "Gas Storage Tank",
+                info: `
+                    <h3>Gas Storage Tank</h3>
+                    <p>High-pressure vessel designed to store hydrogen gas at pressures up to 700 bar.</p>
+                    <ul>
+                        <li><strong>Material:</strong> Carbon fiber reinforced polymer</li>
+                        <li><strong>Capacity:</strong> 100 kg H₂</li>
+                        <li><strong>Temperature:</strong> Ambient</li>
+                        <li><strong>Pressure:</strong> 700 bar</li>
+                        <li><strong>Features:</strong> High-pressure vessel, Lightweight construction, Fast filling capability</li>
+                        <li><strong>Valve System:</strong> High-pressure ball valves with safety relief</li>
+                        <li><strong>Piping:</strong> Stainless steel reinforced with pressure regulators</li>
+                    </ul>
+                `
+            },
+            liquid: {
+                name: "Liquid Storage Tank",
+                info: `
+                    <h3>Liquid Storage Tank</h3>
+                    <p>Cryogenic tank for storing hydrogen as a liquid at -253°C.</p>
+                    <ul>
+                        <li><strong>Material:</strong> Vacuum-insulated stainless steel</li>
+                        <li><strong>Capacity:</strong> 10,000 liters</li>
+                        <li><strong>Temperature:</strong> -253°C</li>
+                        <li><strong>Pressure:</strong> 6-10 bar</li>
+                        <li><strong>Features:</strong> Cryogenic storage, Excellent insulation, High density storage</li>
+                        <li><strong>Valve System:</strong> Cryogenic globe valves with vacuum jackets</li>
+                        <li><strong>Piping:</strong> Vacuum-insulated transfer lines with thermal breaks</li>
+                    </ul>
+                `
+            },
+            hydride: {
+                name: "Hydride Storage Tank",
+                info: `
+                    <h3>Hydride Storage Tank</h3>
+                    <p>System that stores hydrogen in metal hydrides through chemical bonding.</p>
+                    <ul>
+                        <li><strong>Material:</strong> Metal alloy beds</li>
+                        <li><strong>Capacity:</strong> 50 kg H₂</li>
+                        <li><strong>Temperature:</strong> 30-150°C</li>
+                        <li><strong>Pressure:</strong> 1-10 bar</li>
+                        <li><strong>Features:</strong> Low-pressure storage, Compact design, Reversible absorption</li>
+                        <li><strong>Valve System:</strong> Thermal-regulated control valves</li>
+                        <li><strong>Piping:</strong> Heat-traced piping with thermal sensors</li>
+                    </ul>
+                `
+            }
+        };
+
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.6), 0.1, 1000);
+            camera.position.set(0, 3, 8);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.6);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('container').innerHTML = '';
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Add orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.maxPolarAngle = Math.PI * 0.9;
+            controls.minDistance = 3;
+            controls.maxDistance = 15;
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // Add floor
+            const floorGeometry = new THREE.PlaneGeometry(20, 20);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x888888,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.5;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Add grid helper
+            const gridHelper = new THREE.GridHelper(20, 20, 0x555555, 0x333333);
+            scene.add(gridHelper);
+            
+            // Create initial tank
+            createTank('gas');
+            
+            // Add event listeners
+            setupControls();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Start animation loop
+            animate();
+        }
+        
+        function createTank(type) {
+            // Remove existing tank if any
+            if (tank) {
+                scene.remove(tank);
+            }
+            
+            const params = tankParams[type];
+            const color = type === 'gas' ? 0x3498db : type === 'liquid' ? 0x2ecc71 : 0xe74c3c;
+            const radius = type === 'gas' ? 2 : type === 'liquid' ? 3 : 2.5;
+            const height = type === 'gas' ? 4 : type === 'liquid' ? 5 : 3.5;
+            const segments = type === 'gas' ? 32 : type === 'liquid' ? 64 : 48;
+            
+            // Create main tank group
+            tank = new THREE.Group();
+            tank.userData.type = type;
+            tank.userData.info = params.info;
+            
+            // Create tank body
+            const bodyGeometry = new THREE.CylinderGeometry(radius, radius, height, segments);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.4,
+                metalness: 0.7
+            });
+            
+            const tankBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            tankBody.position.y = height / 2;
+            tankBody.castShadow = true;
+            tank.add(tankBody);
+            
+            // Add tank details based on type
+            if (type === 'gas') {
+                // High-pressure gas tank features
+                addHighPressureValves(tank, radius, height);
+                addGasPiping(tank, radius, height);
+                
+                // Add pressure relief valve
+                addPressureReliefValve(tank, radius, height);
+                
+            } else if (type === 'liquid') {
+                // Cryogenic liquid tank features
+                addCryogenicValves(tank, radius, height);
+                addLiquidPiping(tank, radius, height);
+                
+                // Add vacuum insulation
+                addVacuumInsulation(tank, radius, height);
+                
+            } else if (type === 'hydride') {
+                // Metal hydride tank features
+                addHydrideValves(tank, radius, height);
+                addHydridePiping(tank, radius, height);
+                
+                // Add heat exchanger
+                addHeatExchanger(tank, radius, height);
+            }
+            
+            // Add base platform
+            addBasePlatform(tank, radius, height);
+            
+            scene.add(tank);
+        }
+        
+        function addHighPressureValves(parent, radius, height) {
+            const valveColor = 0x333333;
+            const valveMaterial = new THREE.MeshStandardMaterial({
+                color: valveColor,
+                roughness: 0.3,
+                metalness: 0.9
+            });
+            
+            // Main top valve
+            const mainValveGeometry = new THREE.CylinderGeometry(
+                radius * 0.1,
+                radius * 0.15,
+                height * 0.2,
+                16
+            );
+            const mainValve = new THREE.Mesh(mainValveGeometry, valveMaterial);
+            mainValve.position.y = height + height * 0.1;
+            parent.add(mainValve);
+            
+            // Valve handle
+            const handleGeometry = new THREE.BoxGeometry(
+                radius * 0.05,
+                radius * 0.2,
+                radius * 0.05
+            );
+            const handle = new THREE.Mesh(handleGeometry, valveMaterial);
+            handle.position.y = height + height * 0.2;
+            parent.add(handle);
+            
+            // Side valves
+            for (let i = 0; i < 2; i++) {
+                const angle = i * Math.PI * 0.5;
+                const x = Math.cos(angle) * radius * 0.8;
+                const z = Math.sin(angle) * radius * 0.8;
+                
+                // Side pipe
+                const pipeGeometry = new THREE.CylinderGeometry(
+                    radius * 0.05,
+                    radius * 0.05,
+                    radius * 0.5,
+                    8
+                );
+                const pipe = new THREE.Mesh(pipeGeometry, valveMaterial);
+                pipe.position.set(x, height * 0.7, z);
+                pipe.rotation.z = Math.PI / 2;
+                pipe.rotation.y = -angle;
+                parent.add(pipe);
+                
+                // Side valve
+                const sideValveGeometry = new THREE.SphereGeometry(radius * 0.1, 16, 16);
+                const sideValve = new THREE.Mesh(sideValveGeometry, valveMaterial);
+                sideValve.position.set(
+                    x + Math.cos(angle) * radius * 0.3,
+                    height * 0.7,
+                    z + Math.sin(angle) * radius * 0.3
+                );
+                parent.add(sideValve);
+            }
+        }
+        
+        function addGasPiping(parent, radius, height) {
+            const pipeColor = 0xcccccc;
+            const pipeMaterial = new THREE.MeshStandardMaterial({
+                color: pipeColor,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            
+            // Main pipe from top valve
+            const mainPipeGeometry = new THREE.CylinderGeometry(
+                radius * 0.06,
+                radius * 0.06,
+                height * 0.3,
+                8
+            );
+            const mainPipe = new THREE.Mesh(mainPipeGeometry, pipeMaterial);
+            mainPipe.position.y = height + height * 0.25;
+            parent.add(mainPipe);
+            
+            // Pressure gauge
+            const gaugeGeometry = new THREE.CylinderGeometry(
+                radius * 0.08,
+                radius * 0.08,
+                radius * 0.05,
+                16
+            );
+            const gauge = new THREE.Mesh(gaugeGeometry, pipeMaterial);
+            gauge.position.set(
+                radius * 0.6,
+                height * 0.8,
+                0
+            );
+            parent.add(gauge);
+            
+            // Gauge face
+            const gaugeFaceGeometry = new THREE.CylinderGeometry(
+                radius * 0.075,
+                radius * 0.075,
+                radius * 0.01,
+                32
+            );
+            const gaugeFace = new THREE.Mesh(
+                gaugeFaceGeometry,
+                new THREE.MeshStandardMaterial({ color: 0xffffff })
+            );
+            gaugeFace.position.set(
+                radius * 0.6,
+                height * 0.8,
+                radius * 0.03
+            );
+            gaugeFace.rotation.x = Math.PI / 2;
+            parent.add(gaugeFace);
+        }
+        
+        function addCryogenicValves(parent, radius, height) {
+            const valveColor = 0x888888;
+            const valveMaterial = new THREE.MeshStandardMaterial({
+                color: valveColor,
+                roughness: 0.4,
+                metalness: 0.7
+            });
+            
+            // Main top valve with vacuum jacket
+            const mainValveGeometry = new THREE.CylinderGeometry(
+                radius * 0.12,
+                radius * 0.12,
+                height * 0.15,
+                16
+            );
+            const mainValve = new THREE.Mesh(mainValveGeometry, valveMaterial);
+            mainValve.position.y = height + height * 0.08;
+            parent.add(mainValve);
+            
+            // Vacuum jacket for valve
+            const jacketGeometry = new THREE.CylinderGeometry(
+                radius * 0.15,
+                radius * 0.15,
+                height * 0.1,
+                16
+            );
+            const jacket = new THREE.Mesh(
+                jacketGeometry,
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.7
+                })
+            );
+            jacket.position.y = height + height * 0.15;
+            parent.add(jacket);
+            
+            // Side valves (4 around the tank)
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const x = Math.cos(angle) * radius * 0.9;
+                const z = Math.sin(angle) * radius * 0.9;
+                
+                // Cryogenic valve
+                const valveGeometry = new THREE.CylinderGeometry(
+                    radius * 0.08,
+                    radius * 0.08,
+                    radius * 0.2,
+                    16
+                );
+                const valve = new THREE.Mesh(valveGeometry, valveMaterial);
+                valve.position.set(x, height * 0.7, z);
+                valve.rotation.y = -angle;
+                parent.add(valve);
+                
+                // Valve handle
+                const handleGeometry = new THREE.BoxGeometry(
+                    radius * 0.04,
+                    radius * 0.15,
+                    radius * 0.04
+                );
+                const handle = new THREE.Mesh(handleGeometry, valveMaterial);
+                handle.position.set(
+                    x + Math.cos(angle) * radius * 0.1,
+                    height * 0.7,
+                    z + Math.sin(angle) * radius * 0.1
+                );
+                handle.rotation.y = -angle;
+                parent.add(handle);
+            }
+        }
+        
+        function addLiquidPiping(parent, radius, height) {
+            const pipeColor = 0xdddddd;
+            const pipeMaterial = new THREE.MeshStandardMaterial({
+                color: pipeColor,
+                roughness: 0.3,
+                metalness: 0.7
+            });
+            
+            // Main transfer line
+            const transferLineGeometry = new THREE.CylinderGeometry(
+                radius * 0.07,
+                radius * 0.07,
+                height * 0.4,
+                8
+            );
+            const transferLine = new THREE.Mesh(transferLineGeometry, pipeMaterial);
+            transferLine.position.y = height + height * 0.25;
+            parent.add(transferLine);
+            
+            // Vacuum jacket for transfer line
+            const lineJacketGeometry = new THREE.CylinderGeometry(
+                radius * 0.1,
+                radius * 0.1,
+                height * 0.35,
+                8
+            );
+            const lineJacket = new THREE.Mesh(
+                lineJacketGeometry,
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.7
+                })
+            );
+            lineJacket.position.y = height + height * 0.25;
+            parent.add(lineJacket);
+            
+            // Support legs for piping
+            for (let i = 0; i < 2; i++) {
+                const supportGeometry = new THREE.CylinderGeometry(
+                    radius * 0.02,
+                    radius * 0.02,
+                    height * 0.2,
+                    8
+                );
+                const support = new THREE.Mesh(supportGeometry, pipeMaterial);
+                support.position.set(
+                    radius * 0.3 * (i === 0 ? 1 : -1),
+                    height + height * 0.1,
+                    0
+                );
+                support.rotation.z = Math.PI / 2;
+                parent.add(support);
+            }
+        }
+        
+        function addHydrideValves(parent, radius, height) {
+            const valveColor = 0x555555;
+            const valveMaterial = new THREE.MeshStandardMaterial({
+                color: valveColor,
+                roughness: 0.5,
+                metalness: 0.6
+            });
+            
+            // Thermal-regulated valves (top and bottom)
+            for (let i = 0; i < 2; i++) {
+                const yPos = i === 0 ? height * 0.9 : height * 0.1;
+                
+                const valveGeometry = new THREE.CylinderGeometry(
+                    radius * 0.08,
+                    radius * 0.08,
+                    radius * 0.15,
+                    16
+                );
+                const valve = new THREE.Mesh(valveGeometry, valveMaterial);
+                valve.position.y = yPos;
+                parent.add(valve);
+                
+                // Thermal jacket
+                const jacketGeometry = new THREE.CylinderGeometry(
+                    radius * 0.1,
+                    radius * 0.1,
+                    radius * 0.12,
+                    16
+                );
+                const jacket = new THREE.Mesh(
+                    jacketGeometry,
+                    new THREE.MeshStandardMaterial({
+                        color: 0x999999,
+                        roughness: 0.7,
+                        metalness: 0.3
+                    })
+                );
+                jacket.position.y = yPos;
+                parent.add(jacket);
+            }
+        }
+        
+        function addHydridePiping(parent, radius, height) {
+            const pipeColor = 0xaaaaaa;
+            const pipeMaterial = new THREE.MeshStandardMaterial({
+                color: pipeColor,
+                roughness: 0.4,
+                metalness: 0.7
+            });
+            
+            // Heat-traced piping around the tank
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const x = Math.cos(angle) * radius * 1.1;
+                const z = Math.sin(angle) * radius * 1.1;
+                
+                const pipeGeometry = new THREE.CylinderGeometry(
+                    radius * 0.04,
+                    radius * 0.04,
+                    height * 0.8,
+                    8
+                );
+                const pipe = new THREE.Mesh(pipeGeometry, pipeMaterial);
+                pipe.position.set(x, height * 0.5, z);
+                pipe.rotation.z = Math.PI / 2;
+                pipe.rotation.y = -angle;
+                parent.add(pipe);
+                
+                // Thermal sensor boxes
+                const sensorGeometry = new THREE.BoxGeometry(
+                    radius * 0.08,
+                    radius * 0.08,
+                    radius * 0.08
+                );
+                const sensor = new THREE.Mesh(
+                    sensorGeometry,
+                    new THREE.MeshStandardMaterial({ color: 0xff0000 })
+                );
+                sensor.position.set(
+                    x + Math.cos(angle) * radius * 0.1,
+                    height * 0.3 + i * height * 0.15,
+                    z + Math.sin(angle) * radius * 0.1
+                );
+                parent.add(sensor);
+            }
+        }
+        
+        function addPressureReliefValve(parent, radius, height) {
+            const valveMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                roughness: 0.4,
+                metalness: 0.6
+            });
+            
+            const reliefValveGeometry = new THREE.CylinderGeometry(
+                radius * 0.05,
+                radius * 0.07,
+                radius * 0.1,
+                16
+            );
+            const reliefValve = new THREE.Mesh(reliefValveGeometry, valveMaterial);
+            reliefValve.position.set(
+                radius * 0.7,
+                height * 0.9,
+                0
+            );
+            parent.add(reliefValve);
+        }
+        
+        function addVacuumInsulation(parent, radius, height) {
+            const insulationGeometry = new THREE.CylinderGeometry(
+                radius * 1.1,
+                radius * 1.1,
+                height * 1.05,
+                64
+            );
+            const insulation = new THREE.Mesh(
+                insulationGeometry,
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.7
+                })
+            );
+            insulation.position.y = height / 2;
+            parent.add(insulation);
+            
+            // Support rings
+            const ringMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.5,
+                metalness: 0.8
+            });
+            
+            for (let i = 0; i < 3; i++) {
+                const ringGeometry = new THREE.TorusGeometry(
+                    radius * 1.1,
+                    radius * 0.05,
+                    16,
+                    32
+                );
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.position.y = height * 0.2 + i * height * 0.3;
+                ring.rotation.x = Math.PI / 2;
+                parent.add(ring);
+            }
+        }
+        
+        function addHeatExchanger(parent, radius, height) {
+            const exchangerMaterial = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            
+            // Coil around the tank
+            const coilGeometry = new THREE.TorusGeometry(
+                radius * 0.9,
+                radius * 0.05,
+                16,
+                100,
+                Math.PI * 2
+            );
+            const coil = new THREE.Mesh(coilGeometry, exchangerMaterial);
+            coil.position.y = height * 0.5;
+            coil.rotation.x = Math.PI / 2;
+            parent.add(coil);
+            
+            // Heat exchanger unit
+            const unitGeometry = new THREE.BoxGeometry(
+                radius * 0.4,
+                radius * 0.6,
+                radius * 0.4
+            );
+            const unit = new THREE.Mesh(unitGeometry, exchangerMaterial);
+            unit.position.set(
+                radius * 1.3,
+                height * 0.5,
+                0
+            );
+            parent.add(unit);
+            
+            // Pipes to heat exchanger
+            const pipeGeometry = new THREE.CylinderGeometry(
+                radius * 0.04,
+                radius * 0.04,
+                radius * 0.4,
+                8
+            );
+            
+            for (let i = 0; i < 2; i++) {
+                const pipe = new THREE.Mesh(pipeGeometry, exchangerMaterial);
+                pipe.position.set(
+                    radius * 1.1,
+                    height * 0.3 + i * height * 0.4,
+                    0
+                );
+                pipe.rotation.z = Math.PI / 2;
+                parent.add(pipe);
+            }
+        }
+        
+        function addBasePlatform(parent, radius, height) {
+            const platformMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.7,
+                metalness: 0.3
+            });
+            
+            // Main platform
+            const platformGeometry = new THREE.CylinderGeometry(
+                radius * 1.2,
+                radius * 1.2,
+                height * 0.1,
+                32
+            );
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.position.y = -height * 0.05;
+            parent.add(platform);
+            
+            // Support legs
+            const legGeometry = new THREE.CylinderGeometry(
+                radius * 0.05,
+                radius * 0.05,
+                height * 0.3,
+                8
+            );
+            
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const leg = new THREE.Mesh(legGeometry, platformMaterial);
+                leg.position.set(
+                    Math.cos(angle) * radius * 1.1,
+                    -height * 0.2,
+                    Math.sin(angle) * radius * 1.1
+                );
+                parent.add(leg);
+            }
+        }
+        
+        function setupControls() {
+            // Reset View button
+            document.getElementById('resetView').addEventListener('click', () => {
+                controls.reset();
+                camera.position.set(0, 3, 8);
+            });
+            
+            // Tank type selector
+            document.getElementById('tankType').addEventListener('change', (e) => {
+                createTank(e.target.value);
+                // Update info when tank changes
+                document.getElementById('infoContent').innerHTML = tankParams[e.target.value].info;
+            });
+            
+            // Close info panel
+            document.getElementById('closeInfo').addEventListener('click', () => {
+                document.getElementById('tankInfo').style.display = 'none';
+            });
+            
+            // Show info button
+            document.getElementById('showInfo').addEventListener('click', () => {
+                const tankType = document.getElementById('tankType').value;
+                document.getElementById('infoContent').innerHTML = tankParams[tankType].info;
+                document.getElementById('tankInfo').style.display = 'block';
+            });
+            
+            // Click on tank to show info
+            renderer.domElement.addEventListener('click', (event) => {
+                // Calculate mouse position in normalized device coordinates
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = - (event.clientY / (window.innerHeight * 0.6)) * 2 + 1;
+                
+                // Check for intersections
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(tank, true);
+                
+                if (intersects.length > 0) {
+                    document.getElementById('infoContent').innerHTML = tank.userData.info;
+                    document.getElementById('tankInfo').style.display = 'block';
+                }
+            });
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / (window.innerHeight * 0.6);
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight * 0.6);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize the scene
+        init();
+    </script>
+</body>
+</html>

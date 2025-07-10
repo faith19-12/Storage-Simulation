@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D Safety Emergency Simulation</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+   
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .logo {
+      height: 50px;
+      width: auto;
+    }
+  
+    #container {
+      width: 100%;
+      height: 50vh;
+      position: relative;
+    }
+    #emergencyBox {
+      background-color: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 800px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .emergency-title {
+      color: #dc3545;
+      margin-top: 0;
+      border-bottom: 2px solid #dc3545;
+      padding-bottom: 10px;
+    }
+    .emergency-desc {
+      line-height: 1.6;
+    }
+    .response-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px auto;
+      max-width: 800px;
+      flex-wrap: wrap;
+    }
+    .response-buttons button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 160px;
+      justify-content: center;
+    }
+    .response-buttons button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    #evacuateBtn {
+      background-color: #dc3545;
+      color: white;
+    }
+    #notifyBtn {
+      background-color: #fd7e14;
+      color: white;
+    }
+    #handleBtn {
+      background-color: #28a745;
+      color: white;
+    }
+    #ignoreBtn {
+      background-color: #6c757d;
+      color: white;
+    }
+    #responseFeedback {
+      background-color: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 800px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .feedback-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #212529;
+    }
+    .feedback-content {
+      line-height: 1.6;
+    }
+    .positive {
+      border-left: 4px solid #28a745;
+    }
+    .negative {
+      border-left: 4px solid #dc3545;
+    }
+    .neutral {
+      border-left: 4px solid #6c757d;
+    }
+    #safetyTip {
+      background-color: #e2f0fd;
+      padding: 15px;
+      margin: 20px auto;
+      max-width: 800px;
+      border-radius: 8px;
+      border-left: 4px solid #17a2b8;
+      display: none;
+    }
+    .tip-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #17a2b8;
+    }
+    #nextEmergency {
+      display: block;
+      margin: 0 auto 20px;
+      padding: 10px 20px;
+      background-color: #17a2b8;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      display: none;
+    }
+    #nextEmergency:hover {
+      background-color: #138496;
+    }
+    #safetyScore {
+      background-color: white;
+      padding: 15px;
+      margin: 0 auto 20px;
+      max-width: 800px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      font-weight: bold;
+    }
+    .score-value {
+      font-size: 24px;
+      color: #28a745;
+    }
+   
+    @media (max-width: 768px) {
+      nav.main-nav ul {
+        flex-direction: column;
+      }
+      .response-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+      .response-buttons button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-container">
+      <img src="assets/logo.jpg" alt="Company Logo" class="logo" />
+      <h1>3D Safety Emergency Simulation</h1>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <ul>
+      <li><a href="index.html">Dashboard</a></li>
+      <li><a href="storage.html">3D Storage</a></li>
+      <li><a href="pressure.html">Pipeline Pressure</a></li>
+      <li><a href="route.html">Transport Route</a></li>
+      <li><a href="safety.html">Safety Scenario</a></li>
+    </ul>
+  </nav>
+  
+  <div id="container"></div>
+
+  <section id="emergencyBox">
+    <h2 class="emergency-title" id="emergencyTitle">Emergency Scenario</h2>
+    <p class="emergency-desc" id="emergencyDesc">Loading scenario...</p>
+  </section>
+
+  <div class="response-buttons">
+    <button id="evacuateBtn" onclick="respond('evacuate')">🚨 Evacuate Area</button>
+    <button id="notifyBtn" onclick="respond('notify')">📢 Alert Safety Team</button>
+    <button id="handleBtn" onclick="respond('handle')">🧯 Use Equipment</button>
+    <button id="ignoreBtn" onclick="respond('ignore')">🚫 Ignore Alert</button>
+  </div>
+
+  <div id="responseFeedback">
+    <div class="feedback-title">Response Result</div>
+    <div class="feedback-content" id="feedbackContent"></div>
+  </div>
+
+  <div id="safetyTip">
+    <div class="tip-title">Safety Tip</div>
+    <div id="tipContent"></div>
+  </div>
+
+  <button id="nextEmergency" onclick="nextEmergency()">Next Scenario</button>
+
+  <div id="safetyScore">
+    Safety Score: <span class="score-value" id="scoreValue">100</span>/100
+  </div>
+
+  <script>
+    // 3D Scene variables
+    let scene, camera, renderer, controls;
+    let emergencyObjects = [];
+
+    // Game state
+    let currentScenario = 0;
+    let score = 100;
+    let responded = false;
+
+    // Emergency scenarios
+    const scenarios = [
+      {
+        id: 1,
+        title: "Gas Leak Detection",
+        description: "Sensors have detected a hydrogen gas leak in storage area B. The concentration is approaching dangerous levels (2% volume). What is your response?",
+        correctResponse: "evacuate",
+        feedback: {
+          evacuate: {
+            text: "Excellent decision! You immediately initiated evacuation procedures. All personnel were safely evacuated before the concentration reached explosive levels (4%).",
+            score: +10,
+            tip: "Hydrogen becomes explosive at concentrations of 4-75% in air. Always evacuate when leak is detected and let professionals handle it."
+          },
+          notify: {
+            text: "You alerted the safety team, but delayed evacuation. Some personnel were exposed to dangerous gas levels before the area was cleared.",
+            score: -15,
+            tip: "While notifying safety teams is important, evacuation should be the first priority with gas leaks."
+          },
+          handle: {
+            text: "Attempting to handle the leak yourself was dangerous! You were overcome by gas and required rescue. This delayed proper response.",
+            score: -25,
+            tip: "Never attempt to handle gas leaks without proper training and equipment. Evacuate immediately."
+          },
+          ignore: {
+            text: "Ignoring the alarm caused a catastrophic explosion when gas reached ignition sources. Multiple injuries occurred.",
+            score: -40,
+            tip: "Hydrogen leaks are extremely dangerous. Always take alarms seriously and follow emergency protocols."
+          }
+        },
+        setupScene: function() {
+          // Clear previous objects
+          emergencyObjects.forEach(obj => scene.remove(obj));
+          emergencyObjects = [];
+          
+          // Create storage area
+          const storageGeometry = new THREE.BoxGeometry(5, 3, 5);
+          const storageMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x6c757d,
+            transparent: true,
+            opacity: 0.7
+          });
+          const storage = new THREE.Mesh(storageGeometry, storageMaterial);
+          storage.position.y = 1.5;
+          scene.add(storage);
+          emergencyObjects.push(storage);
+
+          // Create gas leak effect
+          for (let i = 0; i < 50; i++) {
+            const gasGeometry = new THREE.SphereGeometry(0.1 + Math.random() * 0.2, 8, 8);
+            const gasMaterial = new THREE.MeshStandardMaterial({
+              color: 0x00ffff,
+              transparent: true,
+              opacity: 0.6
+            });
+            const gas = new THREE.Mesh(gasGeometry, gasMaterial);
+            gas.position.set(
+              -2 + Math.random() * 4,
+              0.5 + Math.random() * 3,
+              -2 + Math.random() * 4
+            );
+            scene.add(gas);
+            emergencyObjects.push(gas);
+          }
+
+          // Add alarm light
+          const alarmLight = new THREE.PointLight(0xff0000, 1, 5);
+          alarmLight.position.set(0, 4, 0);
+          alarmLight.intensity = 2;
+          scene.add(alarmLight);
+          emergencyObjects.push(alarmLight);
+
+          // Animate alarm
+          setInterval(() => {
+            alarmLight.intensity = alarmLight.intensity === 2 ? 0 : 2;
+          }, 500);
+        }
+      },
+      {
+        id: 2,
+        title: "Pipeline Pressure Surge",
+        description: "The control system reports a dangerous pressure surge in the main pipeline (800 psi, max safe is 700 psi). The automatic relief valve failed to activate. What do you do?",
+        correctResponse: "notify",
+        feedback: {
+          evacuate: {
+            text: "While evacuation is sometimes necessary, in this case it delayed critical response. The safety team could have manually activated relief valves.",
+            score: -10,
+            tip: "For pressure surges, first attempt to notify control room who can initiate safety protocols."
+          },
+          notify: {
+            text: "Correct! You immediately notified the control room who activated manual pressure relief systems. Crisis averted.",
+            score: +15,
+            tip: "Pressure surges can lead to ruptures. Always have multiple relief systems and trained responders."
+          },
+          handle: {
+            text: "Attempting manual valve operation without proper procedures caused a minor rupture. Contained but required shutdown.",
+            score: -20,
+            tip: "Only trained personnel should operate emergency systems following strict protocols."
+          },
+          ignore: {
+            text: "Ignoring the warning led to pipeline rupture, causing significant damage and release of hydrogen.",
+            score: -35,
+            tip: "Pressure warnings always require immediate response to prevent catastrophic failures."
+          }
+        },
+        setupScene: function() {
+          emergencyObjects.forEach(obj => scene.remove(obj));
+          emergencyObjects = [];
+          
+          // Create pipeline
+          const pipeGeometry = new THREE.CylinderGeometry(0.3, 0.3, 8, 32);
+          const pipeMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x28a745,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.3
+          });
+          const pipe = new THREE.Mesh(pipeGeometry, pipeMaterial);
+          pipe.rotation.z = Math.PI / 2;
+          scene.add(pipe);
+          emergencyObjects.push(pipe);
+
+          // Create pressure gauge
+          const gaugeGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32);
+          const gaugeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+          const gauge = new THREE.Mesh(gaugeGeometry, gaugeMaterial);
+          gauge.position.set(0, 1, 0);
+          scene.add(gauge);
+          emergencyObjects.push(gauge);
+
+          // Create needle
+          const needleGeometry = new THREE.BoxGeometry(0.4, 0.05, 0.05);
+          const needleMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+          const needle = new THREE.Mesh(needleGeometry, needleMaterial);
+          needle.position.set(0, 1, 0.1);
+          needle.rotation.z = Math.PI * 0.8; // High pressure position
+          scene.add(needle);
+          emergencyObjects.push(needle);
+
+          // Add warning light
+          const warningLight = new THREE.PointLight(0xff8c00, 1, 5);
+          warningLight.position.set(0, 2, 0);
+          scene.add(warningLight);
+          emergencyObjects.push(warningLight);
+        }
+      },
+      {
+        id: 3,
+        title: "Fire Near Storage Tanks",
+        description: "A small electrical fire has started near the hydrogen storage tanks. The fire is currently contained but close to fuel lines. How do you respond?",
+        correctResponse: "handle",
+        feedback: {
+          evacuate: {
+            text: "While evacuation is sometimes necessary, the fire was small and could have been safely extinguished. Unnecessary evacuation caused production delays.",
+            score: -5,
+            tip: "Assess fire size and location before deciding on evacuation. Small contained fires can often be handled immediately."
+          },
+          notify: {
+            text: "You alerted the fire team, but the delay allowed the fire to spread slightly before they arrived. More damage occurred than necessary.",
+            score: -10,
+            tip: "For small fires near critical equipment, immediate action may be required while waiting for professionals."
+          },
+          handle: {
+            text: "Correct response! You used the proper Class C fire extinguisher to put out the electrical fire before it spread. Well done!",
+            score: +20,
+            tip: "Hydrogen fires require special extinguishers (Class C for electrical). Know your equipment locations."
+          },
+          ignore: {
+            text: "Ignoring the fire allowed it to spread to fuel lines, causing a major incident requiring plant shutdown.",
+            score: -50,
+            tip: "Never ignore fires near fuel storage. Even small fires can quickly become catastrophic."
+          }
+        },
+        setupScene: function() {
+          emergencyObjects.forEach(obj => scene.remove(obj));
+          emergencyObjects = [];
+          
+          // Create storage tank
+          const tankGeometry = new THREE.CylinderGeometry(1.5, 1.5, 4, 32);
+          const tankMaterial = new THREE.MeshStandardMaterial({ color: 0x6c757d });
+          const tank = new THREE.Mesh(tankGeometry, tankMaterial);
+          tank.position.y = 2;
+          tank.position.x = -2;
+          scene.add(tank);
+          emergencyObjects.push(tank);
+
+          // Create fire
+          const fireGroup = new THREE.Group();
+          fireGroup.position.set(1, 0.3, 0);
+          
+          for (let i = 0; i < 20; i++) {
+            const flameGeometry = new THREE.ConeGeometry(
+              0.2 + Math.random() * 0.3,
+              0.5 + Math.random() * 0.5,
+              5
+            );
+            const flameMaterial = new THREE.MeshStandardMaterial({
+              color: 0xff4500,
+              emissive: 0xff8c00,
+              emissiveIntensity: 0.5,
+              transparent: true,
+              opacity: 0.8
+            });
+            const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+            flame.position.set(
+              (Math.random() - 0.5) * 0.5,
+              Math.random() * 0.5,
+              (Math.random() - 0.5) * 0.5
+            );
+            flame.rotation.x = Math.random() * Math.PI;
+            flame.rotation.z = Math.random() * Math.PI;
+            fireGroup.add(flame);
+          }
+          scene.add(fireGroup);
+          emergencyObjects.push(fireGroup);
+
+          // Add fire extinguisher
+          const extGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+          const extMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+          const extinguisher = new THREE.Mesh(extGeometry, extMaterial);
+          extinguisher.position.set(0, 0.4, 2);
+          scene.add(extinguisher);
+          emergencyObjects.push(extinguisher);
+
+          // Add fire alarm
+          const alarmLight = new THREE.PointLight(0xff0000, 1, 5);
+          alarmLight.position.set(0, 3, 0);
+          scene.add(alarmLight);
+          emergencyObjects.push(alarmLight);
+
+          // Animate fire and alarm
+          let fireIntensity = 0.5;
+          setInterval(() => {
+            fireIntensity = fireIntensity === 0.5 ? 0.8 : 0.5;
+            fireGroup.children.forEach(flame => {
+              flame.material.emissiveIntensity = fireIntensity;
+            });
+            alarmLight.intensity = alarmLight.intensity === 1 ? 0 : 1;
+          }, 500);
+        }
+      }
+    ];
+
+    // Initialize 3D scene
+    function init3D() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf8f9fa);
+      
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight * 0.5), 0.1, 1000);
+      camera.position.set(0, 3, 8);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight * 0.5);
+      renderer.shadowMap.enabled = true;
+      document.getElementById('container').appendChild(renderer.domElement);
+      
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      
+      // Add lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 7);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+      
+      // Add ground
+      const groundGeometry = new THREE.PlaneGeometry(20, 20);
+      const groundMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xdddddd,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.5;
+      ground.receiveShadow = true;
+      scene.add(ground);
+      
+      // Start with first scenario
+      loadScenario(0);
+      
+      // Handle window resize
+      window.addEventListener('resize', onWindowResize);
+      
+      // Start animation loop
+      animate();
+    }
+
+    function loadScenario(index) {
+      currentScenario = index;
+      responded = false;
+      
+      // Update UI
+      document.getElementById('emergencyTitle').textContent = scenarios[index].title;
+      document.getElementById('emergencyDesc').textContent = scenarios[index].description;
+      document.getElementById('responseFeedback').style.display = 'none';
+      document.getElementById('safetyTip').style.display = 'none';
+      document.getElementById('nextEmergency').style.display = 'none';
+      
+      // Reset button states
+      document.getElementById('evacuateBtn').disabled = false;
+      document.getElementById('notifyBtn').disabled = false;
+      document.getElementById('handleBtn').disabled = false;
+      document.getElementById('ignoreBtn').disabled = false;
+      
+      // Setup 3D scene
+      scenarios[index].setupScene();
+    }
+
+    function respond(action) {
+      if (responded) return;
+      responded = true;
+      
+      const scenario = scenarios[currentScenario];
+      const feedback = scenario.feedback[action];
+      
+      // Update score
+      score = Math.max(0, Math.min(100, score + feedback.score));
+      document.getElementById('scoreValue').textContent = score;
+      
+      // Show feedback
+      const feedbackBox = document.getElementById('responseFeedback');
+      feedbackBox.style.display = 'block';
+      document.getElementById('feedbackContent').textContent = feedback.text;
+      
+      // Set feedback style based on score change
+      if (feedback.score > 0) {
+        feedbackBox.className = 'positive';
+      } else if (feedback.score < 0) {
+        feedbackBox.className = 'negative';
+      } else {
+        feedbackBox.className = 'neutral';
+      }
+      
+      // Show safety tip
+      document.getElementById('safetyTip').style.display = 'block';
+      document.getElementById('tipContent').textContent = feedback.tip;
+      
+      // Show next button
+      document.getElementById('nextEmergency').style.display = 'block';
+      
+      // Disable buttons
+      document.getElementById('evacuateBtn').disabled = true;
+      document.getElementById('notifyBtn').disabled = true;
+      document.getElementById('handleBtn').disabled = true;
+      document.getElementById('ignoreBtn').disabled = true;
+    }
+
+    function nextEmergency() {
+      const nextIndex = (currentScenario + 1) % scenarios.length;
+      loadScenario(nextIndex);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / (window.innerHeight * 0.5);
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight * 0.5);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Initialize the game
+    window.onload = function() {
+      init3D();
+    };
+  </script>
+</body>
+</html>
+
